@@ -1,3 +1,4 @@
+
 import { Currency, ExpenseItem, IntlApplication, LocationInfo, Project } from './types';
 
 // --- Mock Data: International Applications Pool ---
@@ -11,8 +12,10 @@ export const MOCK_INTL_APPLICATIONS: IntlApplication[] = [
       { id: 'U2', name: '李四', level: 'P5', isMain: false, passport: 'E87654321', bankAccount: '6217 0001 **** 1234', bankName: '建设银行上海分行' }
     ],
     trips: [
-      { id: 101, country: '中国', city: '北京', toCountry: '美国', toCity: '拉斯维加斯', startDate: '2024-01-08', endDate: '2024-01-12', days: 4, areaTier: 'Tier1', mealRate: 50, miscRate: 35, isChartered: false, travelerIds: ['U1', 'U2'], businessMeals: 0 },
-      { id: 102, country: '美国', city: '拉斯维加斯', toCountry: '美国', toCity: '旧金山', startDate: '2024-01-12', endDate: '2024-01-15', days: 3, areaTier: 'Tier1', mealRate: 50, miscRate: 35, isChartered: true, travelerIds: ['U1', 'U2'], businessMeals: 2 }
+      /* Fix: Trip interface uses mainTravelerId and fellowTravelerIds instead of travelerIds */
+      { id: 101, country: '中国', city: '北京', toCountry: '美国', toCity: '拉斯维加斯', startDate: '2024-01-08', endDate: '2024-01-12', days: 4, areaTier: 'Tier1', mealRate: 50, miscRate: 35, isChartered: false, mainTravelerId: 'U1', fellowTravelerIds: ['U2'], businessMeals: 0 },
+      /* Fix: Trip interface uses mainTravelerId and fellowTravelerIds instead of travelerIds */
+      { id: 102, country: '美国', city: '拉斯维加斯', toCountry: '美国', toCity: '旧金山', startDate: '2024-01-12', endDate: '2024-01-15', days: 3, areaTier: 'Tier1', mealRate: 50, miscRate: 35, isChartered: true, mainTravelerId: 'U1', fellowTravelerIds: ['U2'], businessMeals: 2 }
     ],
     corpExpenses: [
       { id: 201, source: 'corp', category: '交通', type: '国际机票', date: '2024-01-08', currency: 'CNY', exchangeRate: 1.0, originalAmount: 12500.00, cnyAmount: 12500.00, taxRate: 0, taxAmount: 0, consumerId: 'U1', payeeId: 'CORP', desc: '北京-拉斯维加斯 (UA889) 商旅预订', policyStatus: 'ok', receipt: true },
@@ -29,14 +32,15 @@ export const MOCK_INTL_APPLICATIONS: IntlApplication[] = [
       { id: 'U5', name: '孙七', level: 'P5', isMain: false, passport: 'E11122233', bankAccount: '6227 0033 **** 1122', bankName: '建设银行北京分行' }
     ],
     trips: [
-      { id: 103, country: '中国', city: '上海', toCountry: '德国', toCity: '法兰克福', startDate: '2024-02-20', endDate: '2024-02-21', days: 1, areaTier: 'Tier2', mealRate: 45, miscRate: 25, isChartered: false, travelerIds: ['U3', 'U4', 'U5'], businessMeals: 0 },
-      { id: 104, country: '德国', city: '法兰克福', toCountry: '法国', toCity: '巴黎', startDate: '2024-02-21', endDate: '2024-02-25', days: 4, areaTier: 'Tier1', mealRate: 50, miscRate: 35, isChartered: false, travelerIds: ['U3', 'U4', 'U5'], businessMeals: 0 }
+      /* Fix: Trip interface uses mainTravelerId and fellowTravelerIds instead of travelerIds */
+      { id: 103, country: '中国', city: '上海', toCountry: '德国', toCity: '法兰克福', startDate: '2024-02-20', endDate: '2024-02-21', days: 1, areaTier: 'Tier2', mealRate: 45, miscRate: 25, isChartered: false, mainTravelerId: 'U3', fellowTravelerIds: ['U4', 'U5'], businessMeals: 0 },
+      /* Fix: Trip interface uses mainTravelerId and fellowTravelerIds instead of travelerIds */
+      { id: 104, country: '德国', city: '法兰克福', toCountry: '法国', toCity: '巴黎', startDate: '2024-02-21', endDate: '2024-02-25', days: 4, areaTier: 'Tier1', mealRate: 50, miscRate: 35, isChartered: false, mainTravelerId: 'U3', fellowTravelerIds: ['U4', 'U5'], businessMeals: 0 }
     ],
     corpExpenses: []
   }
 ];
 
-// --- Mock Projects / Data Dictionaries ---
 export const MOCK_PROJECTS: Project[] = [
   { code: 'GLOBAL-2024-EX-001', name: '海外市场拓展专项' },
   { code: 'RD-2024-EU-LAB-002', name: '欧洲实验室共建项目' },

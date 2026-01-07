@@ -3,30 +3,80 @@ import { Search, ChevronDown, Check, X } from 'lucide-react';
 import { Traveler } from '../types';
 import { MOCK_PROJECTS, CURRENCIES, INTERNATIONAL_LOCATIONS } from '../constants';
 
+// --- SingleSelectTraveler ---
+interface SingleSelectTravelerProps {
+  allTravelers: Traveler[];
+  selectedId: string;
+  onChange: (id: string) => void;
+}
+
+export const SingleSelectTraveler: React.FC<SingleSelectTravelerProps> = ({ allTravelers, selectedId, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selected = allTravelers.find(t => t.id === selectedId);
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      <div 
+        className="flex items-center justify-between w-full bg-white border border-slate-200 rounded px-2 py-1 text-[10px] cursor-pointer hover:border-indigo-300 transition-colors h-7"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className={`truncate font-bold ${selected ? 'text-indigo-600' : 'text-slate-400'}`}>
+          {selected ? selected.name : '请选择'}
+        </span>
+        <ChevronDown size={10} className="text-slate-400 shrink-0 ml-1"/>
+      </div>
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-32 bg-white rounded-lg shadow-xl border border-slate-100 z-50 p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+          <div className="max-h-40 overflow-y-auto space-y-1">
+            {allTravelers.map(t => (
+              <div 
+                key={t.id} 
+                className={`px-2 py-1.5 rounded cursor-pointer text-[10px] transition-colors ${selectedId === t.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}
+                onClick={() => { onChange(t.id); setIsOpen(false); }}
+              >
+                {t.name}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- MultiSelectTraveler ---
 interface MultiSelectTravelerProps {
   allTravelers: Traveler[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  disabledId?: string; // Hide this person from fellow list
 }
 
-export const MultiSelectTraveler: React.FC<MultiSelectTravelerProps> = ({ allTravelers, selectedIds, onChange }) => {
+export const MultiSelectTraveler: React.FC<MultiSelectTravelerProps> = ({ allTravelers, selectedIds, onChange, disabledId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) setIsOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [wrapperRef]);
+  }, []);
 
   const filteredTravelers = allTravelers.filter(t => 
-    t.name.toLowerCase().includes(searchTerm.toLowerCase())
+    t.id !== disabledId && t.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const toggleSelection = (id: string) => {
@@ -37,8 +87,7 @@ export const MultiSelectTraveler: React.FC<MultiSelectTravelerProps> = ({ allTra
   };
 
   const getDisplayText = () => {
-    if (!selectedIds || selectedIds.length === 0) return '请选择人员';
-    if (selectedIds.length === allTravelers.length) return `全体 (${selectedIds.length}人)`;
+    if (!selectedIds || selectedIds.length === 0) return '无同行人';
     const names = allTravelers.filter(t => selectedIds.includes(t.id)).map(t => t.name);
     return names.join(', ');
   };
@@ -57,31 +106,18 @@ export const MultiSelectTraveler: React.FC<MultiSelectTravelerProps> = ({ allTra
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute top-full left-0 mt-1 w-40 bg-white rounded-lg shadow-xl border border-slate-100 z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
           <div className="flex items-center gap-1 border-b border-slate-100 pb-1 mb-1">
             <Search size={10} className="text-slate-400"/>
             <input 
               className="w-full text-[10px] outline-none"
-              placeholder="搜索人员..."
+              placeholder="搜索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               autoFocus
             />
           </div>
           <div className="max-h-40 overflow-y-auto space-y-1">
-            <div 
-              className="px-2 py-1 hover:bg-slate-50 rounded cursor-pointer text-[10px] text-slate-500 font-bold flex items-center justify-between"
-              onClick={() => onChange(allTravelers.map(t => t.id))}
-            >
-              <span>全选</span>
-            </div>
-            <div 
-              className="px-2 py-1 hover:bg-slate-50 rounded cursor-pointer text-[10px] text-slate-500 font-bold flex items-center justify-between"
-              onClick={() => onChange([])}
-            >
-              <span>清空</span>
-            </div>
-            <div className="h-px bg-slate-100 my-1"></div>
             {filteredTravelers.map(t => {
               const isSelected = selectedIds.includes(t.id);
               return (
@@ -94,9 +130,8 @@ export const MultiSelectTraveler: React.FC<MultiSelectTravelerProps> = ({ allTra
                     <div className={`w-3 h-3 rounded-full border flex items-center justify-center ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 bg-white'}`}>
                       {isSelected && <Check size={8} className="text-white"/>}
                     </div>
-                    <span className="truncate w-28">{t.name}</span>
+                    <span className="truncate">{t.name}</span>
                   </div>
-                  {t.isMain && <span className="text-[8px] bg-slate-200 px-1 rounded text-slate-500">主</span>}
                 </div>
               );
             })}
@@ -161,7 +196,7 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({ value, onChange, p
               </div>
             ))
           ) : (
-            <div className="px-3 py-3 text-[10px] text-slate-400 text-center">无匹配项目，支持手动输入</div>
+            <div className="px-3 py-3 text-[10px] text-slate-400 text-center">无匹配项目</div>
           )}
         </div>
       )}
@@ -202,13 +237,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
     setSearchTerm(val);
     onChange(val);
     setIsOpen(true);
-
-    // If manual entry matches exactly a known location, update standards
     if (autoStandardsCallback) {
         const match = INTERNATIONAL_LOCATIONS.find(l => `${l.country}-${l.city}` === val);
-        if (match) {
-             autoStandardsCallback({ tier: match.tier, mealRate: match.mealRate, miscRate: match.miscRate });
-        }
+        if (match) autoStandardsCallback({ tier: match.tier, mealRate: match.mealRate, miscRate: match.miscRate });
     }
   };
 

@@ -21,8 +21,17 @@ export interface Trip {
   mealRate: number;
   miscRate: number;
   isChartered: boolean;
-  travelerIds: string[];
+  mainTravelerId: string;
+  fellowTravelerIds: string[];
   businessMeals: number;
+}
+
+export interface LoanRecord {
+  id: number;
+  travelerId: string;
+  loanNo: string;
+  loanAmount: number;
+  clearedAmount: number;
 }
 
 export interface Expense {
