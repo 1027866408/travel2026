@@ -1,11 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   FileText, Plus, Trash2, Zap, Wallet, Globe, 
   Building2, UserCheck, X, CheckCircle2,
   Users, CreditCard, Landmark, ArrowRight, Info,
   Briefcase, User, Calculator, 
-  ToggleLeft, ToggleRight, ArrowLeftRight, Car, Coffee, Layers, Coins, RefreshCw, Wine, Utensils, Settings2, Receipt
+  ToggleLeft, ToggleRight, ArrowLeftRight, Car, Coffee, Layers, Coins, RefreshCw, Wine, Utensils, Settings2, Receipt, Plane,
+  FileUp, Paperclip, UploadCloud
 } from 'lucide-react';
 import { MultiSelectTraveler, SingleSelectTraveler, ProjectPicker, LocationPicker, CurrencySelect } from './components/FormComponents';
 import { BasicInfo, Expense, Traveler, Trip, LoanRecord } from './types';
@@ -15,6 +16,12 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAgentMode, setIsAgentMode] = useState(false); 
   const [showPoolManager, setShowPoolManager] = useState(false);
+  
+  // Invoice Modal State
+  const [invoiceMode, setInvoiceMode] = useState<'create' | 'edit'>('edit');
+  const [activeInvoiceId, setActiveInvoiceId] = useState<number | null>(null);
+  const [invoiceForm, setInvoiceForm] = useState<{file: string, no: string}>({file: '', no: ''});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Basic Info
   const [basicInfo, setBasicInfo] = useState<BasicInfo>({
@@ -43,7 +50,8 @@ const App: React.FC = () => {
 
   // 4. Expenses
   const [expenses, setExpenses] = useState<Expense[]>([
-    { id: 1, source: 'personal', category: '住宿', type: '酒店', date: '2024-01-09', currency: 'USD', exchangeRate: 7.23, originalAmount: 220.00, cnyAmount: 1590.60, consumerId: 'U2', payeeId: 'U1', desc: '拉斯维加斯威尼斯人酒店 (李四房费)', policyStatus: 'ok', receipt: true, expenseItem: '境外差旅费' }
+    { id: 1, source: 'personal', category: '住宿', type: '酒店', date: '2024-01-09', currency: 'USD', exchangeRate: 7.23, originalAmount: 220.00, cnyAmount: 1590.60, consumerId: 'U2', payeeId: 'U1', desc: '拉斯维加斯威尼斯人酒店 (李四房费)', policyStatus: 'ok', receipt: true, expenseItem: '境外差旅费', invoiceNo: 'INV-2024-001', invoiceFile: 'hotel_receipt.pdf' },
+    { id: 2, source: 'corp', category: '交通', type: '国际机票', date: '2024-01-08', currency: 'CNY', exchangeRate: 1.00, originalAmount: 12500.00, cnyAmount: 12500.00, consumerId: 'U1', payeeId: 'CORP', desc: '北京-拉斯维加斯 (UA889) 商旅预订', policyStatus: 'ok', receipt: true, expenseItem: '境外差旅费' }
   ]);
 
   // 5. Loans
@@ -138,6 +146,65 @@ const App: React.FC = () => {
     setLoans(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
   };
 
+  // Invoice Actions
+  const openInvoiceModal = (expense?: Expense) => {
+    if (expense) {
+      setInvoiceMode('edit');
+      setActiveInvoiceId(expense.id);
+      setInvoiceForm({
+        file: expense.invoiceFile || '',
+        no: expense.invoiceNo || ''
+      });
+    } else {
+      setInvoiceMode('create');
+      setActiveInvoiceId(null);
+      setInvoiceForm({ file: '', no: '' });
+    }
+  };
+
+  const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setInvoiceForm(prev => ({ ...prev, file: e.target.files![0].name }));
+    }
+  };
+
+  const saveInvoice = () => {
+    if (invoiceMode === 'edit' && activeInvoiceId) {
+      setExpenses(prev => prev.map(e => {
+        if (e.id !== activeInvoiceId) return e;
+        return { 
+          ...e, 
+          invoiceFile: invoiceForm.file, 
+          invoiceNo: invoiceForm.no,
+          receipt: !!(invoiceForm.file || invoiceForm.no) 
+        };
+      }));
+    } else if (invoiceMode === 'create') {
+      const newExpense: Expense = {
+        id: Date.now(),
+        source: 'personal',
+        category: '餐饮', // Default
+        type: '工作餐',
+        date: basicInfo.docDate,
+        currency: 'USD',
+        exchangeRate: 7.23,
+        originalAmount: 0,
+        cnyAmount: 0,
+        consumerId: travelers[0]?.id || '',
+        payeeId: travelers[0]?.id || '',
+        desc: '',
+        policyStatus: 'ok',
+        receipt: !!(invoiceForm.file || invoiceForm.no),
+        expenseItem: '境外差旅费',
+        invoiceFile: invoiceForm.file,
+        invoiceNo: invoiceForm.no
+      };
+      setExpenses(prev => [...prev, newExpense]);
+    }
+    setActiveInvoiceId(null);
+    setInvoiceMode('edit'); // Reset
+  };
+
   const totals = useMemo(() => {
     let allowanceTotalCNY = 0;
     const travelerAllowanceMap: Record<string, number> = {};
@@ -221,9 +288,9 @@ const App: React.FC = () => {
               <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">补贴/垫付</span>
               <div className="text-2xl font-black text-amber-600 mt-2">¥ {(totals.personalCNY + totals.allowanceTotalCNY).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
            </div>
-           <div className="bg-slate-100 rounded-xl p-4 border border-slate-200">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">借款核销合计</span>
-              <div className="text-2xl font-black text-slate-600 mt-2">¥ {totals.loanOffsetTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+           <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+              <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">企业支付/预订</span>
+              <div className="text-2xl font-black text-blue-600 mt-2">¥ {totals.corpCNY.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
            </div>
            <div className="bg-indigo-600 rounded-xl p-4 shadow-lg text-white">
               <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider">实付个人 (扣减借款)</span>
@@ -237,8 +304,44 @@ const App: React.FC = () => {
             <div className="space-y-1"><label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">单据日期</label><input type="date" className="w-full border-b border-slate-100 py-1 text-sm font-bold bg-transparent outline-none" value={basicInfo.docDate} onChange={(e)=>setBasicInfo({...basicInfo, docDate: e.target.value})}/></div>
             <div className="space-y-1"><label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">报销人/护照</label><div className="flex gap-2"><input className="w-full border-b border-slate-100 py-1 text-sm font-bold bg-transparent outline-none text-indigo-600" value={basicInfo.reimburser} onChange={(e)=>setBasicInfo({...basicInfo, reimburser:e.target.value})}/><input className="w-24 border-b border-slate-100 py-1 text-[10px] text-slate-400 font-mono" value={basicInfo.passportNo} onChange={(e)=>setBasicInfo({...basicInfo, passportNo:e.target.value})}/></div></div>
             <div className="space-y-1"><label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">关联申请单</label><div className="relative"><select className="w-full border-b border-slate-100 py-1 text-sm font-bold bg-transparent outline-none text-indigo-600 truncate pr-4" value={basicInfo.requestId} onChange={(e) => handleSelectApplication(e.target.value)}><option value="">选择申请单...</option>{MOCK_INTL_APPLICATIONS.map(app => <option key={app.id} value={app.id}>{app.title}</option>)}</select>{isSyncing && <RefreshCw size={12} className="absolute right-0 top-1 animate-spin text-indigo-500"/>}</div></div>
-            <div className="md:col-span-2 space-y-1"><label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">关联项目</label><ProjectPicker value={basicInfo.projectCode} onChange={(val) => setBasicInfo({...basicInfo, projectCode: val})} placeholder="输入项目编号或名称..." /></div>
-            <div className="md:col-span-2 space-y-1"><label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">报销事由</label><input className="w-full border-b border-slate-100 py-1 text-sm font-bold outline-none focus:border-indigo-500" value={basicInfo.description} onChange={(e)=>setBasicInfo({...basicInfo, description:e.target.value})} placeholder="说明出差目的与成果..."/></div>
+            
+            <div className="space-y-1">
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">是否项目</label>
+              <div className="flex gap-4 items-center h-7">
+                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" checked={basicInfo.isProject} onChange={()=>setBasicInfo({...basicInfo, isProject:true})} className="text-indigo-600 focus:ring-indigo-500"/> 是</label>
+                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" checked={!basicInfo.isProject} onChange={()=>setBasicInfo({...basicInfo, isProject:false})} className="text-indigo-600 focus:ring-indigo-500"/> 否</label>
+              </div>
+            </div>
+
+            {/* Project Conditional Fields */}
+            {basicInfo.isProject ? (
+              <>
+                <div className="md:col-span-2 space-y-1 animate-in fade-in zoom-in-95">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">关联项目</label>
+                  <ProjectPicker value={basicInfo.projectCode} onChange={(val) => setBasicInfo({...basicInfo, projectCode: val})} placeholder="输入项目编号或名称..." />
+                </div>
+                <div className="space-y-1 animate-in fade-in zoom-in-95">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">项目类型</label>
+                  <select className="w-full border-b border-slate-100 py-1 text-sm font-bold bg-transparent outline-none text-indigo-600" value={basicInfo.projectType} onChange={(e) => setBasicInfo({...basicInfo, projectType: e.target.value})}>
+                    <option value="科研项目">科研项目</option>
+                    <option value="非科研项目">非科研项目</option>
+                    <option value="非项目支出">非项目支出</option>
+                  </select>
+                </div>
+              </>
+            ) : (
+              <div className="md:col-span-3"></div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">资金来源</label>
+              <select className="w-full border-b border-slate-100 py-1 text-sm font-bold bg-transparent outline-none text-slate-700" value={basicInfo.fundSource} onChange={(e) => setBasicInfo({...basicInfo, fundSource: e.target.value})}>
+                <option value="专项资金">专项资金</option>
+                <option value="自筹">自筹</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-3 space-y-1"><label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">报销事由</label><input className="w-full border-b border-slate-100 py-1 text-sm font-bold outline-none focus:border-indigo-500" value={basicInfo.description} onChange={(e)=>setBasicInfo({...basicInfo, description:e.target.value})} placeholder="说明出差目的与成果..."/></div>
         </div>
 
         {/* 2. Intl Trip Table with Refactored Personnel */}
@@ -325,21 +428,35 @@ const App: React.FC = () => {
            </div>
         </div>
 
-        {/* 3. Expenses Detailed */}
+        {/* 3. Expenses Detailed (Personal) */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-2 bg-slate-50 border-b border-slate-100 flex justify-between items-center font-bold text-xs text-slate-600">
-             <div className="flex items-center gap-2"><Wallet size={14}/> 垫付费用明细</div>
-             <button onClick={() => setExpenses([...expenses, {id:Date.now(), source:'personal', category:'餐饮', type:'工作餐', date:basicInfo.docDate, currency:'USD', exchangeRate:7.23, originalAmount:0, cnyAmount:0, consumerId:'U1', payeeId:'U1', desc:'', policyStatus:'ok', receipt:false, expenseItem:'境外差旅费'}])} className="text-[10px] bg-indigo-600 text-white px-3 py-1 rounded font-bold hover:bg-indigo-500 shadow-sm flex items-center gap-1 transition-all"><Plus size={12}/> 新增记录</button>
+             <div className="flex items-center gap-2"><Wallet size={14}/> 垫付费用明细 (个人支付)</div>
+             <div className="flex items-center gap-2">
+               <button 
+                 onClick={() => openInvoiceModal()} 
+                 className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-3 py-1 rounded font-bold hover:bg-indigo-50 shadow-sm flex items-center gap-1 transition-all"
+               >
+                 <UploadCloud size={12}/> 上传发票/凭证
+               </button>
+               <button 
+                 onClick={() => setExpenses([...expenses, {id:Date.now(), source:'personal', category:'餐饮', type:'工作餐', date:basicInfo.docDate, currency:'USD', exchangeRate:7.23, originalAmount:0, cnyAmount:0, consumerId:'U1', payeeId:'U1', desc:'', policyStatus:'ok', receipt:false, expenseItem:'境外差旅费'}])} 
+                 className="text-[10px] bg-indigo-600 text-white px-3 py-1 rounded font-bold hover:bg-indigo-500 shadow-sm flex items-center gap-1 transition-all"
+               >
+                 <Plus size={12}/> 手工录入
+               </button>
+             </div>
           </div>
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50/30 text-slate-400 text-[10px] uppercase font-bold border-b">
               <tr>
-                <th className="p-3">类别</th><th className="p-3">摘要</th><th className="p-3">消费人</th><th className="p-3">币种/金额</th><th className="p-3 text-right text-indigo-700 bg-indigo-50/20">折合人民币</th><th className="p-3 w-10"></th>
+                <th className="p-3">费用项目</th><th className="p-3">类别</th><th className="p-3">摘要</th><th className="p-3">消费人</th><th className="p-3">币种/金额</th><th className="p-3 text-right">汇率</th><th className="p-3 text-right text-indigo-700 bg-indigo-50/20">折合人民币</th><th className="p-3">发票/凭证</th><th className="p-3 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {expenses.filter(e => e.source === 'personal').map(exp => (
                 <tr key={exp.id} className="group hover:bg-slate-50/50 transition-colors">
+                  <td className="p-3 text-slate-500">{exp.expenseItem}</td>
                   <td className="p-3 font-bold">{exp.category}</td>
                   <td className="p-3"><input className="w-full bg-transparent outline-none text-slate-600" value={exp.desc} onChange={(e)=>updateExpense(exp.id, 'desc', e.target.value)} placeholder="事由说明..."/></td>
                   <td className="p-3">
@@ -353,14 +470,22 @@ const App: React.FC = () => {
                       <input type="number" className="w-16 text-right font-black outline-none border-b border-dashed border-slate-200" value={exp.originalAmount} onChange={(e)=>updateExpense(exp.id, 'originalAmount', e.target.value)}/>
                     </div>
                   </td>
+                  <td className="p-3 text-right">
+                    <input type="number" className="w-10 text-right font-bold text-slate-400 bg-transparent outline-none border-b border-dashed border-slate-200 focus:text-indigo-600 focus:border-indigo-400" value={exp.exchangeRate} onChange={(e)=>updateExpense(exp.id, 'exchangeRate', Number(e.target.value))}/>
+                  </td>
                   <td className="p-3 text-right font-black text-indigo-700 bg-indigo-50/10 italic">¥ {exp.cnyAmount.toFixed(2)}</td>
+                  <td className="p-3">
+                    <button onClick={() => openInvoiceModal(exp)} className={`flex items-center gap-1 px-2 py-1 rounded border transition-all ${exp.invoiceNo || exp.invoiceFile ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-500'}`}>
+                      {exp.invoiceNo || exp.invoiceFile ? <><Paperclip size={10}/><span className="max-w-[80px] truncate">{exp.invoiceNo || '已上传'}</span></> : <Paperclip size={10}/>}
+                    </button>
+                  </td>
                   <td className="p-3"><button onClick={()=>setExpenses(expenses.filter(x=>x.id!==exp.id))} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={12}/></button></td>
                 </tr>
               ))}
               {travelers.map(t => totals.travelerAllowanceMap[t.id] > 0 && (
                 <tr key={`sum-${t.id}`} className="bg-amber-50/20 font-bold border-t border-amber-50">
-                  <td className="p-3 text-amber-600 flex items-center gap-1"><Zap size={10} fill="currentColor"/> 补贴结算</td>
-                  <td className="p-3 text-slate-500 italic font-normal text-[10px]" colSpan={3}>境外行程全段补贴自动汇总 ({t.name})</td>
+                  <td className="p-3 text-amber-600 flex items-center gap-1"><Zap size={10} fill="currentColor"/> 补贴</td>
+                  <td className="p-3 text-slate-500 italic font-normal text-[10px]" colSpan={6}>境外行程全段补贴自动汇总 ({t.name})</td>
                   <td className="p-3 text-right text-amber-700 bg-amber-100/20">¥ {totals.travelerAllowanceMap[t.id].toFixed(2)}</td>
                   <td></td>
                 </tr>
@@ -369,7 +494,53 @@ const App: React.FC = () => {
           </table>
         </div>
 
-        {/* 4. Clearance of Loans (NEW MODULE) */}
+        {/* 4. Corporate Payment (Restored Read-Only Module) */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-2 bg-blue-50/50 border-b border-blue-100 flex justify-between items-center font-bold text-xs text-blue-800">
+             <div className="flex items-center gap-2"><Plane size={14}/> 企业支付明细 (公司统付/商旅预订)</div>
+             <div className="text-[10px] text-blue-400 font-normal italic">系统自动同步 • 不可编辑</div>
+          </div>
+          <table className="w-full text-xs text-left">
+            <thead className="bg-blue-50/20 text-slate-400 text-[10px] uppercase font-bold border-b">
+              <tr>
+                <th className="p-3">费用项目</th><th className="p-3">类别</th><th className="p-3">摘要</th><th className="p-3">消费人</th><th className="p-3">币种/金额</th><th className="p-3 text-right text-blue-700 bg-blue-50/10">折合人民币</th><th className="p-3">发票/凭证</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {expenses.filter(e => e.source === 'corp').map(exp => (
+                <tr key={exp.id} className="group hover:bg-slate-50/50 transition-colors">
+                  <td className="p-3 text-slate-500">{exp.expenseItem}</td>
+                  <td className="p-3 font-bold">{exp.category}</td>
+                  <td className="p-3 text-slate-600">{exp.desc}</td>
+                  <td className="p-3 font-bold text-slate-700">
+                    {travelers.find(t => t.id === exp.consumerId)?.name || exp.consumerId}
+                  </td>
+                  <td className="p-3 font-mono font-bold text-slate-600">
+                    {exp.currency} {exp.originalAmount.toFixed(2)}
+                  </td>
+                  <td className="p-3 text-right font-black text-blue-700 bg-blue-50/10 italic">¥ {exp.cnyAmount.toFixed(2)}</td>
+                  <td className="p-3">
+                    {exp.invoiceNo || exp.invoiceFile ? (
+                      <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit">
+                        <Paperclip size={10}/>
+                        <span className="max-w-[80px] truncate">{exp.invoiceNo || '已上传'}</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-300 text-[10px]">--</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {expenses.filter(e => e.source === 'corp').length === 0 && (
+                 <tr>
+                   <td colSpan={7} className="p-8 text-center text-slate-300 text-[10px] italic">无关联的企业支付记录</td>
+                 </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 5. Clearance of Loans */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-2 bg-slate-50 border-b border-slate-100 flex justify-between items-center font-bold text-xs text-slate-600">
              <div className="flex items-center gap-2 uppercase tracking-wider"><Receipt size={14} className="text-indigo-600"/> 核销借款</div>
@@ -411,7 +582,7 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* 5. Settlement & Approval Flow */}
+        {/* 6. Settlement & Approval Flow */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 font-bold text-[10px] text-slate-500 uppercase flex justify-between items-center tracking-widest">
             <div className="flex items-center gap-2"><Landmark size={14} className="text-indigo-600"/> 资金结算明细 (最终执行)</div>
@@ -457,6 +628,55 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Invoice Modal */}
+        {(activeInvoiceId !== null || invoiceMode === 'create') && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                  <h3 className="text-sm font-black text-slate-700 flex items-center gap-2"><FileText size={16} className="text-indigo-600"/> {invoiceMode === 'create' ? '上传发票以新增记录' : '发票/凭证管理'}</h3>
+                  <button onClick={() => { setActiveInvoiceId(null); setInvoiceMode('edit'); }} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={16}/></button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div 
+                    className="border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-indigo-400 hover:bg-indigo-50/10 transition-colors cursor-pointer group"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input type="file" className="hidden" ref={fileInputRef} onChange={handleInvoiceFileChange} accept="image/*,.pdf"/>
+                    <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      {invoiceForm.file ? <FileText size={20} className="text-indigo-600"/> : <UploadCloud size={20} className="text-indigo-400"/>}
+                    </div>
+                    {invoiceForm.file ? (
+                      <div>
+                        <p className="text-xs font-bold text-indigo-700 break-all">{invoiceForm.file}</p>
+                        <p className="text-[10px] text-indigo-400 mt-1">点击更换文件</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs font-bold text-slate-600">点击上传发票文件</p>
+                        <p className="text-[10px] text-slate-400 mt-1">支持 PDF, JPG, PNG</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">发票号码 / 备注</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 transition-colors"
+                      placeholder="例如: INV-2024001..." 
+                      value={invoiceForm.no}
+                      onChange={(e) => setInvoiceForm(prev => ({...prev, no: e.target.value}))}
+                    />
+                  </div>
+                </div>
+                <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                  <button onClick={() => { setActiveInvoiceId(null); setInvoiceMode('edit'); }} className="px-4 py-1.5 rounded text-xs font-bold text-slate-500 hover:bg-slate-200 transition-colors">取消</button>
+                  <button onClick={saveInvoice} className="px-4 py-1.5 rounded bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 shadow-md transition-all">{invoiceMode === 'create' ? '生成记录' : '保存信息'}</button>
+                </div>
+             </div>
+          </div>
+        )}
 
       </div>
     </div>

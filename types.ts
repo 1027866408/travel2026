@@ -1,3 +1,4 @@
+
 export interface Traveler {
   id: string;
   name: string;
@@ -52,6 +53,8 @@ export interface Expense {
   expenseItem?: string;
   taxRate?: number;
   taxAmount?: number;
+  invoiceNo?: string;
+  invoiceFile?: string;
 }
 
 export interface BasicInfo {
